@@ -120,8 +120,9 @@ public:
 	void set_diplay_movment_none();
 private:
 	uint8_t my_addr;
-	uint8_t task;
 	double poschodie;
+	uint8_t task;
+	uint8_t motor_status;
 	uint8_t packet_Send[261];
 	uint8_t packet_Receive[261];
 	INSIDE_ELEVATOR inside_element;
