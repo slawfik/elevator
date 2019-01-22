@@ -38,6 +38,7 @@ extern "C" void PIT_IRQHandler(void)
 		PIT_ClearStatusFlags(PIT, kPIT_Chnl_1, kPIT_TimerFlag);
 		PIT_StopTimer(PIT,kPIT_Chnl_1 );
 		_elevator->lock_Elevator_Cabin();
+		_elevator->set_diplay_movment_none();
 	}
 
 

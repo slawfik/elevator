@@ -42,10 +42,7 @@ int main(void) {
     /* Enter an infinite loop, just incrementing a counter. */
     while(1) {
     	if(elevator.read_Packet(&l_buffer) && !elevator.isAck_paket())	{
-    		if(elevator.pars_comand_button_function())	{	}
-    		else if (elevator.pars_comand_limitSwitch_function()) {
-
-    		}
+    		elevator.pars_comand_button_function();
     	} else {
     		elevator.elevator_task();
     	}

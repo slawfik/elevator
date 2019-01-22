@@ -20,7 +20,7 @@
 
 #define ADR_MOTOR 0xf1
 #define TERMINAL_ADDR 0xd0
-#define ADR_EMERIGENCY_BREAK 0X0f
+#define ADR_EMERIGENCY_BREAK 0x0f
 #define ADR_ELEVATOR_CABIN 0xf0
 #define ADR_ELEVATOR_WATCHDOG_TIMER 0xfe
 #define ADR_INSIDE_button4 0xb4
@@ -63,13 +63,20 @@
 #define START_BYTE 0xA0
 #define SOURCE_BYTE 0x02
 #define COMAND_BYTE 0x04
-#define WD_RESET_VALUE 0x01
+#define WD_RESET_VALUE 0x03
 #define DEACTIVATE_E_BREAK 0x00
 #define ACTIVATE_E_BREAK 0x01
 #define ELEVATOR_GO_DOW ~(2-1)
 #define ELEVATOR_GO_UP	2
 #define INSIDE_BUTON_HIGH_MASK 0x02
 #define OUTSIDE_BUTON_HIGH_MASK 0x01
+#define RED_LIMIT_SWITCH 0x02
+#define YELOW_LIMIT_SWITCH 0x01
+#define	POSCHODIE4 4
+#define	POSCHODIE3 3
+#define	POSCHODIE2 2
+#define	POSCHODIE1 1
+#define	POSCHODIEP 0
 
 typedef struct inside_elevator	{
 	uint8_t activate_B_led_indicator[5];
@@ -79,7 +86,7 @@ typedef struct inside_elevator	{
 typedef struct outside_elevator	{
 	uint8_t call_B_led_indicator[5];
 	uint8_t disp_smer_pohybu;
-	double poschodie;
+	uint8_t poschodie;
 }OUTSIDE_ELEVATOR;
 
 enum adr_elevator_led_inside	{
@@ -90,13 +97,11 @@ enum adr_elevator_led_inside	{
 	ledP = 0x20
 };
 
-
 class Ele_Comunicate {
 public:
 	Ele_Comunicate(uint8_t my_adr);
 	virtual ~Ele_Comunicate();
 	uint8_t pars_comand_button_function();
-	uint8_t pars_comand_limitSwitch_function();
 	uint8_t elevator_task();
 
 	uint8_t read_Packet(L_BUFER* bufer);
@@ -107,20 +112,24 @@ public:
 	uint8_t turnled_ON(uint8_t adr);
 	uint8_t turnled_OFF(uint8_t adr);
 	uint8_t go_motor(uint8_t speed);
+	uint8_t set_display();
 	void stop_motor();
 	void printOnTerminal(char* text);
 	void reset_watchDog();
 	void reset_emerigenci_break();
-	double get_elevator_default_position();
+	void set_diplay_movment_none();
 private:
 	uint8_t my_addr;
-	uint8_t poschodie;
+	uint8_t task;
+	double poschodie;
 	uint8_t packet_Send[261];
 	uint8_t packet_Receive[261];
 	INSIDE_ELEVATOR inside_element;
 	OUTSIDE_ELEVATOR outside_element;
 
 	uint8_t calculateCRC(uint8_t* inputData,uint8_t dataLen);
+	void get_elevator_position();
+	void getPoschodie();
 	void Send();
 };
 

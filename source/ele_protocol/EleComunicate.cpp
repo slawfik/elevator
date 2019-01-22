@@ -11,7 +11,7 @@
 Ele_Comunicate::Ele_Comunicate(uint8_t my_adr)  {
 	// TODO Auto-generated constructor stub
 	my_addr = my_adr;
-	poschodie = 0;
+	task = 0;
 	outside_element.disp_smer_pohybu = COM_DISPLAY_NONE;
 	outside_element.poschodie = 4.5;
 	for(int i=0;i<5;i++)	{
@@ -19,6 +19,8 @@ Ele_Comunicate::Ele_Comunicate(uint8_t my_adr)  {
 		outside_element.call_B_led_indicator[i] = 0;
 	}
 	memset(this->packet_Send,0,sizeof(uint8_t)*261);
+	get_elevator_position();
+	getPoschodie();
 }
 
 Ele_Comunicate::~Ele_Comunicate() {
@@ -73,7 +75,7 @@ uint8_t Ele_Comunicate::createPacket(uint8_t dest,uint8_t source,uint8_t* data,u
 
 uint8_t Ele_Comunicate::read_Packet(L_BUFER* bufer)	{
 	uint8_t ch;
-	memset(packet_Receive,'_',261);
+	packet_Receive[0] = '_';
 	if(bufer->read_from_Buff(&packet_Receive[0]))	{
 		if(packet_Receive[0] == START_BYTE)	{
 			while(bufer->read_from_Buff(&packet_Receive[1]) != 1);
@@ -93,7 +95,8 @@ uint8_t Ele_Comunicate::read_Packet(L_BUFER* bufer)	{
 }
 
 void Ele_Comunicate::reset_watchDog()	{
-	createPacket(ADR_ELEVATOR_WATCHDOG_TIMER,my_addr, (uint8_t*) WD_RESET_VALUE, 1);
+	uint8_t wdreset = WD_RESET_VALUE;
+	createPacket(ADR_ELEVATOR_WATCHDOG_TIMER,my_addr, &wdreset, 1);
 	Send();
 }
 
@@ -103,8 +106,14 @@ void Ele_Comunicate::Send()		{
 	}
 }
 
+void Ele_Comunicate::set_diplay_movment_none()	{
+	outside_element.disp_smer_pohybu = COM_DISPLAY_NONE;
+	set_display();
+}
+
 uint8_t Ele_Comunicate::lock_Elevator_Cabin()	{
-	createPacket(ADR_ELEVATOR_CABIN,my_addr,(uint8_t*) CAB_LOCK, 1);
+	uint8_t cab_lock = CAB_LOCK;
+	createPacket(ADR_ELEVATOR_CABIN,my_addr,(uint8_t*)CAB_LOCK, 1);
 	Send();
 	inside_element.cabin_status = CAB_LOCK;
 	return (uint8_t) CAB_LOCK;
@@ -152,6 +161,31 @@ uint8_t Ele_Comunicate::turnled_OFF(uint8_t adr)	{
 	return 0;
 }
 
+uint8_t Ele_Comunicate::set_display()	{
+	uint8_t _data[5];
+	switch(outside_element.disp_smer_pohybu)	{
+		case COM_DISPLAY_DOWN:
+			_data[0] = COM_DISPLAY_DOWN;
+			_data[1] = outside_element.poschodie + '0';
+			createPacket(ADR_DISPLAY, my_addr, _data, 2);
+			Send();
+			break;
+		case COM_DISPLAY_UP:
+			_data[0] = COM_DISPLAY_UP;
+			_data[1] = outside_element.poschodie + '0';
+			createPacket(ADR_DISPLAY, my_addr, _data, 2);
+			Send();
+			break;
+		case COM_DISPLAY_NONE:
+			_data[0] = COM_DISPLAY_NONE;
+			_data[1] = outside_element.poschodie + '0';
+			createPacket(ADR_DISPLAY, my_addr, _data, 2);
+			Send();
+			break;
+	}
+	return 0;
+}
+
 uint8_t Ele_Comunicate::go_motor(uint8_t smer)		{
 	uint8_t data[5];
 	data[0] = COM_MOTOR_GO;
@@ -159,10 +193,12 @@ uint8_t Ele_Comunicate::go_motor(uint8_t smer)		{
 		data[1] = 0xff;
 		data[2] = 0xff;
 		data[3] = 0xff;
+		outside_element.disp_smer_pohybu = COM_DISPLAY_DOWN;
 	} else {
 		data[1] = 0x00;
 		data[2] = 0x00;
 		data[3] = 0x00;
+		outside_element.disp_smer_pohybu = COM_DISPLAY_UP;
 	}
 	data[4] = smer;
 	createPacket(ADR_MOTOR, my_addr, data, 5);
@@ -181,97 +217,68 @@ void Ele_Comunicate::reset_emerigenci_break()	{
 	Send();
 }
 
-double Ele_Comunicate::get_elevator_default_position()	{
+void Ele_Comunicate::get_elevator_position()	{
 	double* motor_count;
-	//uint8_t com = 0x03;
-	createPacket(ADR_MOTOR, my_addr,(uint8_t*)MOTOR_GET_STATE, 1);
+	uint8_t com = 0x03;
+	createPacket(ADR_MOTOR, my_addr,&com, 1);
 	Send();
 	while(!read_Packet(&l_buffer) || packet_Receive[2] != ADR_MOTOR);
 	motor_count = (double*)(&packet_Receive[4]);
-	return *motor_count;
+	memcpy(&poschodie,(void*)motor_count,sizeof(double));
+}
+
+void Ele_Comunicate::getPoschodie()	{
+	if(0 >= poschodie && -240 <= poschodie)	{
+		outside_element.poschodie = POSCHODIE4;
+	} else if (-241 >= poschodie && -440 <= poschodie) {
+		outside_element.poschodie = POSCHODIE3;
+	}  else if (-441 >= poschodie && -640 <= poschodie) {
+		outside_element.poschodie = POSCHODIE2;
+	}  else if (-641 >= poschodie && -841 <= poschodie) {
+		outside_element.poschodie = POSCHODIE1;
+	} else {
+		outside_element.poschodie = POSCHODIEP;
+	}
 }
 
 uint8_t Ele_Comunicate::elevator_task()	{
-	if(outside_element.disp_smer_pohybu == COM_DISPLAY_NONE)	{
-		for(int i = 0;i<5;i++)	{
-
+	task = 0;
+	for(int u = 0;u<5;u++)	{
+		if(outside_element.call_B_led_indicator[u] || inside_element.activate_B_led_indicator[u])	{
+			task++;
 		}
-	} else if (outside_element.disp_smer_pohybu == COM_DISPLAY_DOWN) {
-
-	} else {	 //COM_DISPLAY_UP
-
 	}
-
-	return 0;
-}
-
-uint8_t Ele_Comunicate::pars_comand_limitSwitch_function()	{
-	switch(packet_Receive[2])	{
-		case ADR_LIMIT_SWITCH1:
-			if(inside_element.activate_B_led_indicator[1] || outside_element.call_B_led_indicator[1])	{
-				if(packet_Receive[COMAND_BYTE] == 0x01)	{
-					stop_motor();
-				}	else if (packet_Receive[COMAND_BYTE] == 0x02) {
-					//open cabine and close
-					turnled_OFF((uint8_t) ADR_OUTSIDE_LED1);
-					turnled_OFF((uint8_t) ADR_INSIDE_LED1);
-					unlock_Elevator_Cabin();
-					PIT_StartTimer(PIT, kPIT_Chnl_1);
-				}
-			} //else status display o poschodí
-			return 1;
-		case ADR_LIMIT_SWITCH2:
-			if(inside_element.activate_B_led_indicator[2] || outside_element.call_B_led_indicator[2])	{
-				if(packet_Receive[COMAND_BYTE] == 0x01)	{
-					stop_motor();
-				}	else if (packet_Receive[COMAND_BYTE] == 0x02) {
-					//open cabine and close
-					turnled_OFF((uint8_t) ADR_OUTSIDE_LED2);
-					turnled_OFF((uint8_t) ADR_INSIDE_LED2);
-					unlock_Elevator_Cabin();
-					PIT_StartTimer(PIT, kPIT_Chnl_1);
+	if(task)	{
+		if(outside_element.disp_smer_pohybu == COM_DISPLAY_UP)	{
+			for(int i = outside_element.poschodie+1;i<4;i++)	{
+				if(outside_element.call_B_led_indicator[i] || inside_element.activate_B_led_indicator[i])	{
+					go_motor((uint8_t)ELEVATOR_GO_UP);
+					task--;
 				}
 			}
-			return 1;
-		case ADR_LIMIT_SWITCH3:
-			if(inside_element.activate_B_led_indicator[3] || outside_element.call_B_led_indicator[3])	{
-				if(packet_Receive[COMAND_BYTE] == 0x01)	{
-					stop_motor();
-				}	else if (packet_Receive[COMAND_BYTE] == 0x02) {
-					//open cabine and close
-					turnled_OFF((uint8_t) ADR_OUTSIDE_LED3);
-					turnled_OFF((uint8_t) ADR_INSIDE_LED3);
-					unlock_Elevator_Cabin();
-					PIT_StartTimer(PIT, kPIT_Chnl_1);
+		} else if (outside_element.disp_smer_pohybu == COM_DISPLAY_DOWN) {
+			for(int i = outside_element.poschodie;i>0;i--)	{
+				if(outside_element.call_B_led_indicator[i] || inside_element.activate_B_led_indicator[i])	{
+					go_motor((uint8_t)ELEVATOR_GO_DOW);
+					task--;
 				}
 			}
-			return 1;
-		case ADR_LIMIT_SWITCH4:
-			if(inside_element.activate_B_led_indicator[4] || outside_element.call_B_led_indicator[4])	{
-				if(packet_Receive[COMAND_BYTE] == 0x01)	{
-					stop_motor();
-				}	else if (packet_Receive[COMAND_BYTE] == 0x02) {
-					//open cabine and close
-					turnled_OFF((uint8_t) ADR_OUTSIDE_LED4);
-					turnled_OFF((uint8_t) ADR_INSIDE_LED4);
-					unlock_Elevator_Cabin();
-					PIT_StartTimer(PIT, kPIT_Chnl_1);
+		} else {	 //COM_DISPLAY_NONE
+			for(int i = outside_element.poschodie;i>0;i--)	{
+				if(outside_element.call_B_led_indicator[i] || inside_element.activate_B_led_indicator[i])	{
+					go_motor((uint8_t)ELEVATOR_GO_DOW);
+					outside_element.disp_smer_pohybu = COM_DISPLAY_DOWN;
+					task--;
 				}
 			}
-			return 1;
-		case ADR_LIMIT_SWITCHP:
-			if(inside_element.activate_B_led_indicator[0] || outside_element.call_B_led_indicator[0])	{
-				if(packet_Receive[COMAND_BYTE] == 0x01)	{
-					stop_motor();
-				}	else if (packet_Receive[COMAND_BYTE] == 0x02) {
-					//open cabine and close
-					turnled_OFF((uint8_t) ADR_OUTSIDE_LEDP);
-					turnled_OFF((uint8_t) ADR_INSIDE_LEDP);
-					unlock_Elevator_Cabin();
-					PIT_StartTimer(PIT, kPIT_Chnl_1);
+			for(int i = outside_element.poschodie+1;i<4;i++)	{
+				if(outside_element.call_B_led_indicator[i] || inside_element.activate_B_led_indicator[i])	{
+					go_motor((uint8_t)ELEVATOR_GO_UP);
+					outside_element.disp_smer_pohybu = COM_DISPLAY_UP;
+					task--;
 				}
 			}
-			return 1;
+		}
 	}
 	return 0;
 }
@@ -280,7 +287,6 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 	switch(packet_Receive[SOURCE_BYTE])	{
 		case ADR_INSIDE_button1:
 			turnled_ON((uint8_t) ADR_INSIDE_LED1);
-			outside_element.poschodie = get_elevator_default_position();
 			return 1;
 		case ADR_INSIDE_button2:
 			turnled_ON((uint8_t) ADR_INSIDE_LED2);
@@ -293,7 +299,6 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 			return 1;
 		case ADR_INSIDE_buttonP:
 			turnled_ON((uint8_t) ADR_INSIDE_LEDP);
-			stop_motor();
 			return 1;
 		case ADR_CALL_BUTTON1:
 			turnled_ON((uint8_t) ADR_OUTSIDE_LED1);
@@ -303,18 +308,107 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 			return 1;
 		case ADR_CALL_BUTTON3:
 			turnled_ON((uint8_t) ADR_OUTSIDE_LED3);
-			stop_motor();
 			return 1;
 		case ADR_CALL_BUTTON4:
 			turnled_ON((uint8_t) ADR_OUTSIDE_LED4);
-			go_motor((uint8_t)ELEVATOR_GO_UP);
+			//go_motor((uint8_t)ELEVATOR_GO_UP);
 			return 1;
 		case ADR_CALL_BUTTONP:
 			turnled_ON((uint8_t) ADR_OUTSIDE_LEDP);
-			go_motor((uint8_t)ELEVATOR_GO_DOW);
+			//go_motor((uint8_t)ELEVATOR_GO_DOW);
 			return 1;
 		case TERMINAL_ADDR:
 			reset_emerigenci_break();
+			return 1;
+		case ADR_LIMIT_SWITCH1:
+			if(inside_element.activate_B_led_indicator[1] || outside_element.call_B_led_indicator[1])	{
+				if(packet_Receive[COMAND_BYTE] == YELOW_LIMIT_SWITCH)	{
+					stop_motor();
+				}	else if (packet_Receive[COMAND_BYTE] == RED_LIMIT_SWITCH) {
+					//open cabine and close
+					turnled_OFF((uint8_t) ADR_OUTSIDE_LED1);
+					turnled_OFF((uint8_t) ADR_INSIDE_LED1);
+					unlock_Elevator_Cabin();
+					PIT_StartTimer(PIT, kPIT_Chnl_1);
+				}
+			}  // status display o poschodí
+			if(packet_Receive[COMAND_BYTE] == RED_LIMIT_SWITCH)		{
+				get_elevator_position();
+				getPoschodie();
+				set_display();
+			}
+			return 1;
+		case ADR_LIMIT_SWITCH2:
+			if(inside_element.activate_B_led_indicator[2] || outside_element.call_B_led_indicator[2])	{
+				if(packet_Receive[COMAND_BYTE] == YELOW_LIMIT_SWITCH)	{
+					stop_motor();
+				}	else if (packet_Receive[COMAND_BYTE] == RED_LIMIT_SWITCH) {
+					//open cabine and close
+					turnled_OFF((uint8_t) ADR_OUTSIDE_LED2);
+					turnled_OFF((uint8_t) ADR_INSIDE_LED2);
+					unlock_Elevator_Cabin();
+					PIT_StartTimer(PIT, kPIT_Chnl_1);
+				}
+			}
+			if(packet_Receive[COMAND_BYTE] == RED_LIMIT_SWITCH)		{
+				get_elevator_position();
+				getPoschodie();
+				set_display();
+			}
+			return 1;
+		case ADR_LIMIT_SWITCH3:
+			if(inside_element.activate_B_led_indicator[3] || outside_element.call_B_led_indicator[3])	{
+				if(packet_Receive[COMAND_BYTE] == YELOW_LIMIT_SWITCH)	{
+					stop_motor();
+				}	else if (packet_Receive[COMAND_BYTE] == RED_LIMIT_SWITCH) {
+					//open cabine and close
+					turnled_OFF((uint8_t) ADR_OUTSIDE_LED3);
+					turnled_OFF((uint8_t) ADR_INSIDE_LED3);
+					unlock_Elevator_Cabin();
+					PIT_StartTimer(PIT, kPIT_Chnl_1);
+				}
+			}
+			if(packet_Receive[COMAND_BYTE] == RED_LIMIT_SWITCH)		{
+				get_elevator_position();
+				getPoschodie();
+				set_display();
+			}
+			return 1;
+		case ADR_LIMIT_SWITCH4:
+			if(inside_element.activate_B_led_indicator[4] || outside_element.call_B_led_indicator[4])	{
+				if(packet_Receive[COMAND_BYTE] == YELOW_LIMIT_SWITCH)	{
+					stop_motor();
+				}	else if (packet_Receive[COMAND_BYTE] == RED_LIMIT_SWITCH) {
+					//open cabine and close
+					turnled_OFF((uint8_t) ADR_OUTSIDE_LED4);
+					turnled_OFF((uint8_t) ADR_INSIDE_LED4);
+					unlock_Elevator_Cabin();
+					PIT_StartTimer(PIT, kPIT_Chnl_1);
+				}
+			}
+			if(packet_Receive[COMAND_BYTE] == RED_LIMIT_SWITCH)		{
+				get_elevator_position();
+				getPoschodie();
+				set_display();
+			}
+			return 1;
+		case ADR_LIMIT_SWITCHP:
+			if(inside_element.activate_B_led_indicator[0] || outside_element.call_B_led_indicator[0])	{
+				if(packet_Receive[COMAND_BYTE] == YELOW_LIMIT_SWITCH)	{
+					stop_motor();
+				}	else if (packet_Receive[COMAND_BYTE] == RED_LIMIT_SWITCH) {
+					//open cabine and close
+					turnled_OFF((uint8_t) ADR_OUTSIDE_LEDP);
+					turnled_OFF((uint8_t) ADR_INSIDE_LEDP);
+					unlock_Elevator_Cabin();
+					PIT_StartTimer(PIT, kPIT_Chnl_1);
+				}
+			}
+			if(packet_Receive[COMAND_BYTE] == RED_LIMIT_SWITCH)		{
+				get_elevator_position();
+				getPoschodie();
+				set_display();
+			}
 			return 1;
 	}
 	return 0;
