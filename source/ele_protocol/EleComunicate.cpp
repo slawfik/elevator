@@ -12,7 +12,6 @@ Ele_Comunicate::Ele_Comunicate(uint8_t my_adr)  {
 	// TODO Auto-generated constructor stub
 	my_addr = my_adr;
 	outside_element.disp_smer_pohybu = COM_DISPLAY_NONE;
-	outside_element.poschodie = 4.5;
 	motor_status = COM_MOTOR_STOP;
 	for(int i=0;i<5;i++)	{
 		inside_element.activate_B_led_indicator[i] = 0;
@@ -21,6 +20,7 @@ Ele_Comunicate::Ele_Comunicate(uint8_t my_adr)  {
 	memset(this->packet_Send,0,sizeof(uint8_t)*261);
 	get_elevator_position();
 	getPoschodie();
+	lock_Elevator_Cabin();
 }
 
 Ele_Comunicate::~Ele_Comunicate() {
@@ -107,15 +107,13 @@ void Ele_Comunicate::Send()		{
 }
 
 void Ele_Comunicate::set_diplay_movment_none()	{
-	if(!task)	{
-		outside_element.disp_smer_pohybu = COM_DISPLAY_NONE;
-		set_display();
-	}
+	outside_element.disp_smer_pohybu = COM_DISPLAY_NONE;
+	set_display();
 }
 
 uint8_t Ele_Comunicate::lock_Elevator_Cabin()	{
-	uint8_t cab_lock = CAB_LOCK;
-	createPacket(ADR_ELEVATOR_CABIN,my_addr,(uint8_t*)CAB_LOCK, 1);
+	uint8_t cab_lock = CAB_LOCK;//(uint8_t*)CAB_LOCK
+	createPacket(ADR_ELEVATOR_CABIN,my_addr,&cab_lock, 1);
 	Send();
 	inside_element.cabin_status = CAB_LOCK;
 	return (uint8_t) CAB_LOCK;
@@ -231,13 +229,13 @@ void Ele_Comunicate::get_elevator_position()	{
 }
 
 void Ele_Comunicate::getPoschodie()	{
-	if(0 >= poschodie && -240 <= poschodie)	{
+	if(0 >= poschodie && -250 <= poschodie)	{
 		outside_element.poschodie = POSCHODIE4;
-	} else if (-241 >= poschodie && -440 <= poschodie) {
+	} else if (-251 >= poschodie && -450 <= poschodie) {
 		outside_element.poschodie = POSCHODIE3;
-	}  else if (-441 >= poschodie && -640 <= poschodie) {
+	}  else if (-451 >= poschodie && -650 <= poschodie) {
 		outside_element.poschodie = POSCHODIE2;
-	}  else if (-641 >= poschodie && -841 <= poschodie) {
+	}  else if (-651 >= poschodie && -851 <= poschodie) {
 		outside_element.poschodie = POSCHODIE1;
 	} else {
 		outside_element.poschodie = POSCHODIEP;
@@ -246,14 +244,13 @@ void Ele_Comunicate::getPoschodie()	{
 
 uint8_t Ele_Comunicate::elevator_task()	{
 	uint8_t ret = 0;
-	task = 0;
 	/*for(int u = 0;u<5;u++)	{
 		if(outside_element.call_B_led_indicator[u] || inside_element.activate_B_led_indicator[u])	{
 			task++;
 		}
 	}*/
 	//if(task)	{
-		if(motor_status == COM_MOTOR_STOP)	{
+		if(motor_status == COM_MOTOR_STOP && inside_element.cabin_status == CAB_LOCK)	{
 			for(int i = outside_element.poschodie-1;i>=0;i--)	{
 				if(outside_element.call_B_led_indicator[i] || inside_element.activate_B_led_indicator[i])	{
 					go_motor((uint8_t)ELEVATOR_GO_DOW);
@@ -263,7 +260,7 @@ uint8_t Ele_Comunicate::elevator_task()	{
 				}
 			}
 			if(!ret)	{
-				for(int i = outside_element.poschodie+1;i<4;i++)	{
+				for(int i = outside_element.poschodie+1;i<=4;i++)	{
 					if(outside_element.call_B_led_indicator[i] || inside_element.activate_B_led_indicator[i])	{
 						go_motor((uint8_t)ELEVATOR_GO_UP);
 						//task--;
@@ -280,36 +277,84 @@ uint8_t Ele_Comunicate::elevator_task()	{
 uint8_t Ele_Comunicate::pars_comand_button_function()	{
 	switch(packet_Receive[SOURCE_BYTE])	{
 		case ADR_INSIDE_button1:
-			turnled_ON((uint8_t) ADR_INSIDE_LED1);
+			if(outside_element.poschodie != 1)	{
+				turnled_ON((uint8_t) ADR_INSIDE_LED1);
+			} else {
+				unlock_Elevator_Cabin();
+				PIT_StartTimer(PIT, kPIT_Chnl_1);
+			}
 			return 1;
 		case ADR_INSIDE_button2:
+			if(outside_element.poschodie != 2)	{
 			turnled_ON((uint8_t) ADR_INSIDE_LED2);
+			} else {
+				unlock_Elevator_Cabin();
+				PIT_StartTimer(PIT, kPIT_Chnl_1);
+			}
 			return 1;
 		case ADR_INSIDE_button3:
-			turnled_ON((uint8_t) ADR_INSIDE_LED3);
+			if(outside_element.poschodie != 3)	{
+				turnled_ON((uint8_t) ADR_INSIDE_LED3);
+			} else {
+				unlock_Elevator_Cabin();
+				PIT_StartTimer(PIT, kPIT_Chnl_1);
+			}
 			return 1;
 		case ADR_INSIDE_button4:
-			turnled_ON((uint8_t) ADR_INSIDE_LED4);
+			if(outside_element.poschodie != 4)	{
+				turnled_ON((uint8_t) ADR_INSIDE_LED4);
+			} else {
+				unlock_Elevator_Cabin();
+				PIT_StartTimer(PIT, kPIT_Chnl_1);
+			}
 			return 1;
 		case ADR_INSIDE_buttonP:
-			turnled_ON((uint8_t) ADR_INSIDE_LEDP);
+			if(outside_element.poschodie != 0)	{
+				turnled_ON((uint8_t) ADR_INSIDE_LEDP);
+			} else {
+				unlock_Elevator_Cabin();
+				PIT_StartTimer(PIT, kPIT_Chnl_1);
+			}
 			return 1;
 		case ADR_CALL_BUTTON1:
-			turnled_ON((uint8_t) ADR_OUTSIDE_LED1);
+			if(outside_element.poschodie != 1)	{
+				turnled_ON((uint8_t) ADR_OUTSIDE_LED1);
+			} else {
+				unlock_Elevator_Cabin();
+				PIT_StartTimer(PIT, kPIT_Chnl_1);
+			}
 			return 1;
 		case ADR_CALL_BUTTON2:
-			turnled_ON((uint8_t) ADR_OUTSIDE_LED2);
+			if(outside_element.poschodie != 2)	{
+				turnled_ON((uint8_t) ADR_OUTSIDE_LED2);
+			} else {
+				unlock_Elevator_Cabin();
+				PIT_StartTimer(PIT, kPIT_Chnl_1);
+			}
 			return 1;
 		case ADR_CALL_BUTTON3:
-			turnled_ON((uint8_t) ADR_OUTSIDE_LED3);
+			if(outside_element.poschodie != 3)	{
+				turnled_ON((uint8_t) ADR_OUTSIDE_LED3);
+			} else {
+				unlock_Elevator_Cabin();
+				PIT_StartTimer(PIT, kPIT_Chnl_1);
+			}
 			return 1;
 		case ADR_CALL_BUTTON4:
-			turnled_ON((uint8_t) ADR_OUTSIDE_LED4);
-			//go_motor((uint8_t)ELEVATOR_GO_UP);
+			if(outside_element.poschodie != 4)	{
+				turnled_ON((uint8_t) ADR_OUTSIDE_LED4);
+			} else {
+				unlock_Elevator_Cabin();
+				PIT_StartTimer(PIT, kPIT_Chnl_1);
+			}
 			return 1;
 		case ADR_CALL_BUTTONP:
-			turnled_ON((uint8_t) ADR_OUTSIDE_LEDP);
-			//go_motor((uint8_t)ELEVATOR_GO_DOW);
+			if(outside_element.poschodie != 0)	{
+				turnled_ON((uint8_t) ADR_OUTSIDE_LEDP);
+			} else {
+				unlock_Elevator_Cabin();
+				PIT_StartTimer(PIT, kPIT_Chnl_1);
+			}
 			return 1;
 		case TERMINAL_ADDR:
 			reset_emerigenci_break();
@@ -322,8 +367,8 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 					//open cabine and close
 					turnled_OFF((uint8_t) ADR_OUTSIDE_LED1);
 					turnled_OFF((uint8_t) ADR_INSIDE_LED1);
-					motor_status = COM_MOTOR_STOP;
 					unlock_Elevator_Cabin();
+					motor_status = COM_MOTOR_STOP;
 					PIT_StartTimer(PIT, kPIT_Chnl_1);
 				}
 			}  // status display o poschodí
@@ -341,8 +386,8 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 					//open cabine and close
 					turnled_OFF((uint8_t) ADR_OUTSIDE_LED2);
 					turnled_OFF((uint8_t) ADR_INSIDE_LED2);
-					motor_status = COM_MOTOR_STOP;
 					unlock_Elevator_Cabin();
+					motor_status = COM_MOTOR_STOP;
 					PIT_StartTimer(PIT, kPIT_Chnl_1);
 				}
 			}
@@ -360,8 +405,8 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 					//open cabine and close
 					turnled_OFF((uint8_t) ADR_OUTSIDE_LED3);
 					turnled_OFF((uint8_t) ADR_INSIDE_LED3);
-					motor_status = COM_MOTOR_STOP;
 					unlock_Elevator_Cabin();
+					motor_status = COM_MOTOR_STOP;
 					PIT_StartTimer(PIT, kPIT_Chnl_1);
 				}
 			}
@@ -379,8 +424,8 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 					//open cabine and close
 					turnled_OFF((uint8_t) ADR_OUTSIDE_LED4);
 					turnled_OFF((uint8_t) ADR_INSIDE_LED4);
-					motor_status = COM_MOTOR_STOP;
 					unlock_Elevator_Cabin();
+					motor_status = COM_MOTOR_STOP;
 					PIT_StartTimer(PIT, kPIT_Chnl_1);
 				}
 			}
@@ -398,8 +443,8 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 					//open cabine and close
 					turnled_OFF((uint8_t) ADR_OUTSIDE_LEDP);
 					turnled_OFF((uint8_t) ADR_INSIDE_LEDP);
-					motor_status = COM_MOTOR_STOP;
 					unlock_Elevator_Cabin();
+					motor_status = COM_MOTOR_STOP;
 					PIT_StartTimer(PIT, kPIT_Chnl_1);
 				}
 			}
