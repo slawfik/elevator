@@ -166,7 +166,8 @@ uint8_t Ele_Comunicate::unlock_Elevator_Cabin()		{
 
 /**
  *	Zistí či sa jedná o ack paket
- *	@return true/false
+ *	@return true - ackPaket
+ *	@return false - no ack paket
  */
 uint8_t Ele_Comunicate::isAck_paket()	{
 	if(packet_Receive[0] == START_BYTE && packet_Receive[1] == 0 && packet_Receive[2] == 0 && packet_Receive[3] == 0/* && packet_Receive[4] == 0*/)		{
@@ -266,6 +267,12 @@ uint8_t Ele_Comunicate::go_motor(const uint8_t smer)		{
 	return 0;
 }
 
+void Ele_Comunicate::restart_watchDog()	{
+	uint8_t restart_WD = WD_RESTART_VALUE;
+	createPacket(ADR_ELEVATOR_WATCHDOG_TIMER, my_addr, &restart_WD, 1);
+	Send();
+}
+
 /**
  * Vytvorý a pošle paket s príkazom stop pre motor.
  */
@@ -291,7 +298,7 @@ void Ele_Comunicate::get_elevator_position()	{
 	uint8_t com = 0x03;
 	createPacket(ADR_MOTOR, my_addr,&com, 1);
 	Send();
-	/** Pokiaľ neprišiel paket od motora tak čítaj paket.*/
+	/** Pokiaľ neprišiel paket od motora tak čítaj paket. Warning popísaný v dokumentácii*/
 	while(!read_Packet(&l_buffer) || packet_Receive[2] != ADR_MOTOR);
 	motor_count = (double*)(&packet_Receive[4]);
 	memcpy(&poschodie,(void*)motor_count,sizeof(double));
@@ -316,6 +323,7 @@ void Ele_Comunicate::getPoschodie()	{
 
 /**
  * Funkcia kontroluje všetky požiadavky od užívateľa výťahu a posiela výťah daným smerom.
+ * @return 0;
  */
 uint8_t Ele_Comunicate::elevator_task()	{
 	uint8_t ret = 0;
@@ -438,7 +446,11 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 			}
 			return 1;
 		case TERMINAL_ADDR:
-			reset_emerigenci_break();
+			if(packet_Receive[COMAND_BYTE] == 'R' && packet_Receive[COMAND_BYTE+1] == 'E' && packet_Receive[COMAND_BYTE+2] == 'B')	{
+				reset_emerigenci_break();
+			}	else if(packet_Receive[COMAND_BYTE] == 'R' && packet_Receive[COMAND_BYTE+1] == 'W' && packet_Receive[COMAND_BYTE+2] == 'D')	{
+				restart_watchDog();
+			}
 			return 1;
 		case ADR_LIMIT_SWITCH1:
 			if(inside_element.activate_B_led_indicator[1] || outside_element.call_B_led_indicator[1])	{
