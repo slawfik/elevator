@@ -15,8 +15,6 @@ private:
 	uint8_t cread, cwrite;
 	uint8_t* bufer;
 	uint8_t* start;
-	uint8_t* write;
-	uint8_t* read;
 	uint8_t size;
 public:
 	L_BUFER(uint8_t* buf,uint8_t p_size);

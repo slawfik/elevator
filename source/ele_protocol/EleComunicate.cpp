@@ -8,6 +8,10 @@
 #include <ele_protocol/EleComunicate.h>
 //#include "fsl_pit.h"
 
+/**
+ * @file    EleComunicate.cpp
+ * Konštruktor triedy Ele_Comunicate v ktorom sú nainicializované defaultné hodnoty.
+ */
 Ele_Comunicate::Ele_Comunicate(uint8_t my_adr)  {
 	// TODO Auto-generated constructor stub
 	my_addr = my_adr;
@@ -44,7 +48,13 @@ const uint8_t crcArray[] = { 	0, 94, 188, 226, 97, 63, 221, 131, 194, 156, 126, 
 					233, 183, 85, 11, 136, 214, 52, 106, 43, 117, 151, 201, 74, 20, 246, 168,
 					116, 42, 200, 150, 21, 75, 169, 247, 182, 232, 10, 84, 215, 137, 107, 53 };
 
-uint8_t Ele_Comunicate::calculateCRC(uint8_t* inputData,uint8_t dataLen)	{
+
+/**
+ * Funkcia vypočítava crc kontrolný súčete pre paket.
+ * @param const uint8_t* inputData - je pointer na data s ktorý je crc počítané
+ * @param uint8_t dataLen - počet poslaných dát
+ */
+uint8_t Ele_Comunicate::calculateCRC(const uint8_t* inputData,uint8_t dataLen)	{
 	uint8_t CRC_value = 0;
 	uint8_t index = 0;
 	for(uint8_t i = 0;i<dataLen;i++)	{
@@ -55,7 +65,14 @@ uint8_t Ele_Comunicate::calculateCRC(uint8_t* inputData,uint8_t dataLen)	{
 	return CRC_value;
 }
 
-uint8_t Ele_Comunicate::createPacket(uint8_t dest,uint8_t source,uint8_t* data,uint8_t data_len)	{
+/**
+ * Funkcia vytvorý paket ktorý je uložený ako pole znakov.
+ * @param const uint8_t dest - predstavuje cieľovú adresu
+ * @param const uint8_t source - zdrojová adresa
+ * @patam const uint8_t* data - pointer na data pre poslanie
+ * @param const uint8_t data_len - počet dát pre odoslanie
+ */
+uint8_t Ele_Comunicate::createPacket(const uint8_t dest,const uint8_t source,const uint8_t* data,const uint8_t data_len)	{
 	uint8_t calc[255];
 	calc[0] = dest;
 	calc[1] = source;
@@ -73,6 +90,10 @@ uint8_t Ele_Comunicate::createPacket(uint8_t dest,uint8_t source,uint8_t* data,u
 	return 0;
 }
 
+/**
+ * Načíta paket z prijímajúceho bufra.
+ * @param L_BUFER* bufer - prijímajúci buffer z ktorého čítame.
+ */
 uint8_t Ele_Comunicate::read_Packet(L_BUFER* bufer)	{
 	uint8_t ch;
 	packet_Receive[0] = '_';
@@ -94,23 +115,36 @@ uint8_t Ele_Comunicate::read_Packet(L_BUFER* bufer)	{
 	return 0;
 }
 
+/**
+ * Funkcia resetuje watchdog timer výťahu aby sa nespustili záchranné brzdy.
+ */
 void Ele_Comunicate::reset_watchDog()	{
 	uint8_t wdreset = WD_RESET_VALUE;
 	createPacket(ADR_ELEVATOR_WATCHDOG_TIMER,my_addr, &wdreset, 1);
 	Send();
 }
 
+/**
+ * Funkcia odošle paket pripravený na odoslanie funkciou createPaket();
+ */
 void Ele_Comunicate::Send()		{
 	for(int i=0;i<packet_Send[3]+5;i++)	{
 		PUTCHAR(packet_Send[i]);
 	}
 }
 
+/**
+ * Nastavý premennú a disp_smer_pohybu na hodnotu NONE
+ */
 void Ele_Comunicate::set_diplay_movment_none()	{
 	outside_element.disp_smer_pohybu = COM_DISPLAY_NONE;
 	set_display();
 }
 
+/**
+ *	Vytvorí paket s dátami pre uzamknutie kabíny a odošle ho.
+ *	@return status kabíny
+ */
 uint8_t Ele_Comunicate::lock_Elevator_Cabin()	{
 	uint8_t cab_lock = CAB_LOCK;//(uint8_t*)CAB_LOCK
 	createPacket(ADR_ELEVATOR_CABIN,my_addr,&cab_lock, 1);
@@ -119,6 +153,10 @@ uint8_t Ele_Comunicate::lock_Elevator_Cabin()	{
 	return (uint8_t) CAB_LOCK;
 }
 
+/**
+ *	Vytvorí paket s dátami pre odomknutie kabíny a došle ho.
+ *	@return stats kabíny
+ */
 uint8_t Ele_Comunicate::unlock_Elevator_Cabin()		{
 	createPacket(ADR_ELEVATOR_CABIN,my_addr, (uint8_t*) CAB_UNLOCK, 1);
 	Send();
@@ -126,6 +164,10 @@ uint8_t Ele_Comunicate::unlock_Elevator_Cabin()		{
 	return (uint8_t) CAB_UNLOCK;
 }
 
+/**
+ *	Zistí či sa jedná o ack paket
+ *	@return true/false
+ */
 uint8_t Ele_Comunicate::isAck_paket()	{
 	if(packet_Receive[0] == START_BYTE && packet_Receive[1] == 0 && packet_Receive[2] == 0 && packet_Receive[3] == 0/* && packet_Receive[4] == 0*/)		{
 		return TRUE;
@@ -134,11 +176,18 @@ uint8_t Ele_Comunicate::isAck_paket()	{
 	}
 }
 
-void Ele_Comunicate::printOnTerminal(char* text)	{
+/**
+ *	Funkcia vypíše komand na terminál výťahu.
+ *	@param const char* text - text pre výpis
+ */
+void Ele_Comunicate::printOnTerminal(const char* text)	{
 	createPacket(TERMINAL_ADDR, my_addr, (uint8_t*) text,strlen(text));
 	Send();
 }
 
+/**
+ * Funkcia vytvorí paket pre zapnutie ledky odošle ho a nastavý príslušný flag.
+ */
 uint8_t Ele_Comunicate::turnled_ON(uint8_t adr)	{
 	createPacket(adr, my_addr,(uint8_t*) LED_ON, 1);
 	Send();
@@ -150,6 +199,9 @@ uint8_t Ele_Comunicate::turnled_ON(uint8_t adr)	{
 	return 0;
 }
 
+/**
+ * Funkcia vytvorý paket pre vypnutie ledky, odošle ho a nastavý prišlušný flag.
+ */
 uint8_t Ele_Comunicate::turnled_OFF(uint8_t adr)	{
 	createPacket(adr, my_addr,(uint8_t*) LED_OFF, 1);
 	Send();
@@ -161,6 +213,9 @@ uint8_t Ele_Comunicate::turnled_OFF(uint8_t adr)	{
 	return 0;
 }
 
+/**
+ * Nastaví na displej smer a poschos chodie výťahu.
+ */
 uint8_t Ele_Comunicate::set_display()	{
 	uint8_t _data[5];
 	switch(outside_element.disp_smer_pohybu)	{
@@ -186,7 +241,11 @@ uint8_t Ele_Comunicate::set_display()	{
 	return 0;
 }
 
-uint8_t Ele_Comunicate::go_motor(uint8_t smer)		{
+/**
+ * Funkcia nastavý paket pre pohyb motoru v danom smere, nastavý príslušný flag a paket odošle.
+ * @param const uint8_t smer - číslo od 100 do -100
+ */
+uint8_t Ele_Comunicate::go_motor(const uint8_t smer)		{
 	uint8_t data[5];
 	data[0] = COM_MOTOR_GO;
 	if(smer == (uint8_t)ELEVATOR_GO_DOW)		{
@@ -207,27 +266,40 @@ uint8_t Ele_Comunicate::go_motor(uint8_t smer)		{
 	return 0;
 }
 
+/**
+ * Vytvorý a pošle paket s príkazom stop pre motor.
+ */
 void Ele_Comunicate::stop_motor()	{
 	uint8_t stop_comand = 0x01;
 	createPacket(ADR_MOTOR, my_addr,&stop_comand, 1);//(uint8_t*) COM_MOTOR_STOP
 	Send();
 }
 
+/**
+ * Vytvorí paket pre uvoľnenie záchranných bŕzd.
+ */
 void Ele_Comunicate::reset_emerigenci_break()	{
 	createPacket(ADR_EMERIGENCY_BREAK, my_addr,DEACTIVATE_E_BREAK ,1);
 	Send();
 }
 
+/**
+ * Získa od výťahu poziciu kde sa nachádza v double hodnote.
+ */
 void Ele_Comunicate::get_elevator_position()	{
 	double* motor_count;
 	uint8_t com = 0x03;
 	createPacket(ADR_MOTOR, my_addr,&com, 1);
 	Send();
+	/** Pokiaľ neprišiel paket od motora tak čítaj paket.*/
 	while(!read_Packet(&l_buffer) || packet_Receive[2] != ADR_MOTOR);
 	motor_count = (double*)(&packet_Receive[4]);
 	memcpy(&poschodie,(void*)motor_count,sizeof(double));
 }
 
+/**
+ * Funkcia na základe double hodnoty od výťahu o jeho pozícii vráti číslo poschodia na ktorom sa výťah nachádza.
+ */
 void Ele_Comunicate::getPoschodie()	{
 	if(0 >= poschodie && -250 <= poschodie)	{
 		outside_element.poschodie = POSCHODIE4;
@@ -242,6 +314,9 @@ void Ele_Comunicate::getPoschodie()	{
 	}
 }
 
+/**
+ * Funkcia kontroluje všetky požiadavky od užívateľa výťahu a posiela výťah daným smerom.
+ */
 uint8_t Ele_Comunicate::elevator_task()	{
 	uint8_t ret = 0;
 	/*for(int u = 0;u<5;u++)	{
@@ -274,10 +349,15 @@ uint8_t Ele_Comunicate::elevator_task()	{
 	return 0;
 }
 
+/**
+ * Funkcia na základe zdrojovej adresy v pakete sa rozvetvuje. Case-i obsahujú všetky adresy tlačidiel a limitSwitch-ov.
+ * @return 1 - znamená, že zdrojová adresa sa zhodovala v jednom case-i
+ * @return 0 - znamená, že zdrojová adresa na nezhodovala
+ */
 uint8_t Ele_Comunicate::pars_comand_button_function()	{
 	switch(packet_Receive[SOURCE_BYTE])	{
 		case ADR_INSIDE_button1:
-			if(outside_element.poschodie != 1)	{
+			if(outside_element.poschodie != 1 || motor_status == COM_MOTOR_GO)	{
 				turnled_ON((uint8_t) ADR_INSIDE_LED1);
 			} else {
 				unlock_Elevator_Cabin();
@@ -285,7 +365,7 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 			}
 			return 1;
 		case ADR_INSIDE_button2:
-			if(outside_element.poschodie != 2)	{
+			if(outside_element.poschodie != 2 || motor_status == COM_MOTOR_GO)	{
 			turnled_ON((uint8_t) ADR_INSIDE_LED2);
 			} else {
 				unlock_Elevator_Cabin();
@@ -293,7 +373,7 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 			}
 			return 1;
 		case ADR_INSIDE_button3:
-			if(outside_element.poschodie != 3)	{
+			if(outside_element.poschodie != 3 || motor_status == COM_MOTOR_GO)	{
 				turnled_ON((uint8_t) ADR_INSIDE_LED3);
 			} else {
 				unlock_Elevator_Cabin();
@@ -301,15 +381,16 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 			}
 			return 1;
 		case ADR_INSIDE_button4:
-			if(outside_element.poschodie != 4)	{
+			if(outside_element.poschodie != 4 || motor_status == COM_MOTOR_GO)	{
 				turnled_ON((uint8_t) ADR_INSIDE_LED4);
 			} else {
 				unlock_Elevator_Cabin();
 				PIT_StartTimer(PIT, kPIT_Chnl_1);
+
 			}
 			return 1;
 		case ADR_INSIDE_buttonP:
-			if(outside_element.poschodie != 0)	{
+			if(outside_element.poschodie != 0  || motor_status == COM_MOTOR_GO)	{
 				turnled_ON((uint8_t) ADR_INSIDE_LEDP);
 			} else {
 				unlock_Elevator_Cabin();
@@ -317,7 +398,7 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 			}
 			return 1;
 		case ADR_CALL_BUTTON1:
-			if(outside_element.poschodie != 1)	{
+			if(outside_element.poschodie != 1 || motor_status == COM_MOTOR_GO)	{
 				turnled_ON((uint8_t) ADR_OUTSIDE_LED1);
 			} else {
 				unlock_Elevator_Cabin();
@@ -325,15 +406,15 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 			}
 			return 1;
 		case ADR_CALL_BUTTON2:
-			if(outside_element.poschodie != 2)	{
+			if(outside_element.poschodie != 2 || motor_status == COM_MOTOR_GO)	{
 				turnled_ON((uint8_t) ADR_OUTSIDE_LED2);
 			} else {
-				unlock_Elevator_Cabin();
-				PIT_StartTimer(PIT, kPIT_Chnl_1);
+					unlock_Elevator_Cabin();
+					PIT_StartTimer(PIT, kPIT_Chnl_1);
 			}
 			return 1;
 		case ADR_CALL_BUTTON3:
-			if(outside_element.poschodie != 3)	{
+			if(outside_element.poschodie != 3 || motor_status == COM_MOTOR_GO)	{
 				turnled_ON((uint8_t) ADR_OUTSIDE_LED3);
 			} else {
 				unlock_Elevator_Cabin();
@@ -341,7 +422,7 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 			}
 			return 1;
 		case ADR_CALL_BUTTON4:
-			if(outside_element.poschodie != 4)	{
+			if(outside_element.poschodie != 4 || motor_status == COM_MOTOR_GO)	{
 				turnled_ON((uint8_t) ADR_OUTSIDE_LED4);
 			} else {
 				unlock_Elevator_Cabin();
@@ -349,7 +430,7 @@ uint8_t Ele_Comunicate::pars_comand_button_function()	{
 			}
 			return 1;
 		case ADR_CALL_BUTTONP:
-			if(outside_element.poschodie != 0)	{
+			if(outside_element.poschodie != 0 || motor_status == COM_MOTOR_GO)	{
 				turnled_ON((uint8_t) ADR_OUTSIDE_LEDP);
 			} else {
 				unlock_Elevator_Cabin();

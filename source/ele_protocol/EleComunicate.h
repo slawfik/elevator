@@ -107,14 +107,14 @@ public:
 	uint8_t read_Packet(L_BUFER* bufer);
 	uint8_t lock_Elevator_Cabin();
 	uint8_t unlock_Elevator_Cabin();
-	uint8_t createPacket(uint8_t dest,uint8_t source,uint8_t* data,uint8_t data_len);
+	uint8_t createPacket(const uint8_t dest,const uint8_t source,const uint8_t* data,const uint8_t data_len);
 	uint8_t isAck_paket();
 	uint8_t turnled_ON(uint8_t adr);
 	uint8_t turnled_OFF(uint8_t adr);
-	uint8_t go_motor(uint8_t speed);
+	uint8_t go_motor(const uint8_t speed);
 	uint8_t set_display();
 	void stop_motor();
-	void printOnTerminal(char* text);
+	void printOnTerminal(const char* text);
 	void reset_watchDog();
 	void reset_emerigenci_break();
 	void set_diplay_movment_none();
@@ -127,7 +127,7 @@ private:
 	INSIDE_ELEVATOR inside_element;
 	OUTSIDE_ELEVATOR outside_element;
 
-	uint8_t calculateCRC(uint8_t* inputData,uint8_t dataLen);
+	uint8_t calculateCRC(const uint8_t* inputData,uint8_t dataLen);
 	void get_elevator_position();
 	void getPoschodie();
 	void Send();

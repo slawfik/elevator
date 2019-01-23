@@ -10,6 +10,10 @@
 
 Ele_Comunicate* _elevator;
 
+/**
+ * Inicializuje sa PIT a inicializuje sa aj pointer na Ele_Comunicate
+ * @param Ele_Comunicate* pa_elevator - pomocou tahto parametra sa nastaví globálny pointer na Ele_Comunicate.
+ */
 void pit_init(Ele_Comunicate* pa_elevator)	{
 	_elevator = pa_elevator;
 
@@ -28,6 +32,9 @@ void pit_init(Ele_Comunicate* pa_elevator)	{
 	//PIT_StartTimer(PIT, kPIT_Chnl_1);
 }
 
+/**
+ * Obsluha prerušenie pre PIT.
+ */
 extern "C" void PIT_IRQHandler(void)
 {
 	/* Clear interrupt flag.*/
